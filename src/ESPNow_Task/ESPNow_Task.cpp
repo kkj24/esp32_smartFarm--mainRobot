@@ -44,7 +44,7 @@ void ESPNow_Task_handle(void *param) {
                 Serial.println(F("[ESP-NOW] TimeOut!..."));
             }
 
-            #if 0
+            #if 1
 
             Serial.println(F("================"));
 

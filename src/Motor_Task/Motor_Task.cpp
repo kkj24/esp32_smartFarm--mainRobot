@@ -40,8 +40,8 @@ void handleMotor_Task(void *param) {
 
     TickType_t lastTick = 0;
 
-    uint8_t MIN = 0;
-    uint8_t MAX = 10;
+    uint8_t MIN = 15;
+    uint8_t MAX = 35;
     
     uint8_t condition = 0;
 
@@ -67,83 +67,56 @@ void handleMotor_Task(void *param) {
 
         ir.readBt(&IR1, &IR2);
 
-        if(nowTick - lastTick >= pdMS_TO_TICKS(100)) {
+        if(nowTick - lastTick >= pdMS_TO_TICKS(50)) {
             lastTick = nowTick;
 
-            Serial.printf("B: %d, D: %d\n", IR2, IR1);
+            //Serial.printf("B: %d, D: %d\n", IR2, IR1);
 
             if(data_espnow.vMoisAv <= MIN)
                 condition = RUN;
+
             else if(data_espnow.vMoisAv >= MAX && !IR2)
                 condition = HOME;
 
-            /*if(millis() - espnow_lib.getTimes() >= timeOut_espnow)
-                condition = HOME;
-                */
-        }
+            else if(data_espnow.vMoisAv >= MAX && IR2)
+                condition = STOP;
 
+            if(millis() - espnow_lib.getTimes() >= timeOut_espnow)
+                condition = HOME;
+        }
+            
+        uint8_t pwm_speed = 190;
+        
         switch(condition) {
             case STOP:
                 mdriver.run(0b00000000, 0, 0);
 
+                digitalWrite(R1, HIGH); 
+                digitalWrite(R2, HIGH);
             break;
                 
             case RUN:
-                static bool lastIR1 = false;
-                static bool lastIR2 = false;
+                digitalWrite(R1, LOW);
+                digitalWrite(R2, LOW);
 
-                static bool state = false;
+                if(IR1 && !IR2) 
+                    mdriver.run(0b01010000, pwm_speed, pwm_speed);
 
-                static bool stateRelay = false;
-
-                {
-                    uint32_t now = millis();
-                    static uint32_t last = 0;
-
-                    if(now - last >= 50) {
-                        last = now;
-
-                        stateRelay = !stateRelay;
-
-                        digitalWrite(R1, stateRelay);
-                        digitalWrite(R2, stateRelay);
-                    }
-                }
-
-                if((!lastIR1 && IR1) || (!lastIR2 && IR2)) {
-                    state = false;
-                }
-
-                lastIR1 = IR1;
-                lastIR2 = IR2;
-
-                if(state) {
-                    if (IR1 == 1)
-                        mdriver.run(0b01010000, 200, 200);
-                    else if (IR2 == 1)
-                        mdriver.run(0b10100000, 200, 200);
-                } else {
-                    mdriver.run(0b00000000, 0, 0);
-
-                    static uint32_t last = 0;
-                    uint32_t now = millis();
-
-                    if(now - last >= 2000) {
-                        last = now;
-
-                        state = true;
-                    }
-                }
-                break;
+                else if(IR2 && !IR1)
+                    mdriver.run(0b10100000, pwm_speed, pwm_speed);
+            break;
 
             case HOME:
-                mdriver.run(0b10100000, 200, 200);
+                mdriver.run(0b01010000, pwm_speed, pwm_speed);
                 if(IR2)
                     condition = STOP;
+
+                digitalWrite(R1, HIGH);
+                digitalWrite(R2, HIGH);
 
             break;
         }
 
-        xTaskDelayUntil(&saveTick, pdMS_TO_TICKS(50));
+        xTaskDelayUntil(&saveTick, pdMS_TO_TICKS( 50));
     }
 }
